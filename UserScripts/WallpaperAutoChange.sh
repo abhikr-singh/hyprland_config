@@ -9,8 +9,6 @@
 
 wallust_refresh=$HOME/.config/hypr/scripts/RefreshNoWaybar.sh
 
-focused_monitor=$(hyprctl monitors | awk '/^Monitor/{name=$2} /focused: yes/{print name}')
-
 if [[ $# -lt 1 ]] || [[ ! -d $1   ]]; then
 	echo "Usage:
 	$0 <dir containing images>"
@@ -31,9 +29,20 @@ while true; do
 		done \
 		| sort -n | cut -d':' -f2- \
 		| while read -r img; do
-			awww img -o $focused_monitor "$img"
+			focused_monitor=$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .name')
+			awww img -o "$focused_monitor" "$img"
 			# Regenerate colors from the exact image path to avoid cache races
-			$HOME/.config/hypr/scripts/WallustSwww.sh "$img"
+			"$HOME/.config/hypr/scripts/WallustSwww.sh" "$img" "$focused_monitor"
+
+			# Also update other monitors that don't have a specific wallpaper set.
+			for mon in $(hyprctl monitors -j | jq -r '.[] | .name'); do
+				if [[ "$mon" != "$focused_monitor" ]]; then
+					if [[ ! -f "$HOME/.config/hypr/wallpaper_effects/.wallpaper_$mon" ]]; then
+						awww img -o "$mon" "$img"
+					fi
+				fi
+			done
+
 			# Refresh UI components that depend on wallust output
 			$wallust_refresh
 			sleep $INTERVAL

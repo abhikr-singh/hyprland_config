@@ -178,10 +178,23 @@ apply_image_wallpaper() {
     awww-daemon --format xrgb &
   fi
 
+  # Apply to focused monitor
   awww img -o "$focused_monitor" "$image_path" $SWWW_PARAMS
 
   # Run additional scripts (pass the image path to avoid cache race conditions)
-  "$SCRIPTSDIR/WallustSwww.sh" "$image_path"
+  "$SCRIPTSDIR/WallustSwww.sh" "$image_path" "$focused_monitor"
+
+  # Also update other monitors that don't have a specific wallpaper set.
+  # These monitors fall back to .wallpaper_current on restart, so updating them now
+  # ensures consistency between the current session and after a restart.
+  for mon in $(hyprctl monitors -j | jq -r '.[] | .name'); do
+    if [[ "$mon" != "$focused_monitor" ]]; then
+      if [[ ! -f "$HOME/.config/hypr/wallpaper_effects/.wallpaper_$mon" ]]; then
+        awww img -o "$mon" "$image_path" $SWWW_PARAMS
+      fi
+    fi
+  done
+
   sleep 2
   "$SCRIPTSDIR/Refresh.sh"
   sleep 1
